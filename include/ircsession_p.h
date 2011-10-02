@@ -49,6 +49,7 @@ public:
     QString nickName;
     QString realName;
     bool active;
+    IrcServerInfo info;
 };
 
 #endif // IRCSESSION_P_H
