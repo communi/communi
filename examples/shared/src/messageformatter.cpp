@@ -20,12 +20,31 @@
 #include <QTime>
 #include <QColor>
 
+static bool nameLessThan(const QString &n1, const QString &n2)
+{
+    const bool o1 = n1.startsWith("@");
+    const bool o2 = n2.startsWith("@");
+
+    if (o1 && !o2)
+        return true;
+    if (!o1 && o2)
+        return false;
+
+    const bool v1 = n1.startsWith("+");
+    const bool v2 = n2.startsWith("+");
+
+    if (v1 && !v2 && !o2)
+        return true;
+    if (!v1 && !o1 && v2)
+        return false;
+
+    return QString::localeAwareCompare(n1.toLower(), n2.toLower()) < 0;
+}
+
 MessageFormatter::MessageFormatter(QObject* parent) : QObject(parent)
 {
-    d.format = true;
     d.highlight = false;
     d.timeStamp = false;
-    d.firstNames = true;
 }
 
 MessageFormatter::~MessageFormatter()
@@ -37,7 +56,7 @@ QStringList MessageFormatter::highlights() const
     return d.highlights;
 }
 
-void MessageFormatter::setHightlights(const QStringList& highlights)
+void MessageFormatter::setHighlights(const QStringList& highlights)
 {
     d.highlights = highlights;
 }
@@ -52,14 +71,70 @@ void MessageFormatter::setTimeStamp(bool timeStamp)
     d.timeStamp = timeStamp;
 }
 
-bool MessageFormatter::classFormat() const
+QString MessageFormatter::messageFormat() const
 {
-    return d.format;
+    return d.messageFormat;
 }
 
-void MessageFormatter::setClassFormat(bool format)
+void MessageFormatter::setMessageFormat(const QString& format)
 {
-    d.format = format;
+    d.messageFormat = format;
+}
+
+QString MessageFormatter::eventFormat() const
+{
+    return d.prefixedFormats.value("!");
+}
+
+void MessageFormatter::setEventFormat(const QString& format)
+{
+    d.prefixedFormats.insert("!", format);
+}
+
+QString MessageFormatter::noticeFormat() const
+{
+    return d.prefixedFormats.value("[");
+}
+
+void MessageFormatter::setNoticeFormat(const QString& format)
+{
+    d.prefixedFormats.insert("[", format);
+}
+
+QString MessageFormatter::actionFormat() const
+{
+    return d.prefixedFormats.value("*");
+}
+
+void MessageFormatter::setActionFormat(const QString& format)
+{
+    d.prefixedFormats.insert("*", format);
+}
+
+QString MessageFormatter::unknownFormat() const
+{
+    return d.prefixedFormats.value("?");
+}
+
+void MessageFormatter::setUnknownFormat(const QString& format)
+{
+    d.prefixedFormats.insert("?", format);
+}
+
+QString MessageFormatter::highlightFormat() const
+{
+    return d.highlightFormat;
+}
+
+void MessageFormatter::setHighlightFormat(const QString& format)
+{
+    d.highlightFormat = format;
+}
+
+QStringList MessageFormatter::currentNames() const
+{
+    qSort(d.names.begin(), d.names.end(), nameLessThan);
+    return d.names;
 }
 
 QString MessageFormatter::formatMessage(IrcMessage* message) const
@@ -114,27 +189,17 @@ QString MessageFormatter::formatMessage(IrcMessage* message) const
     if (formatted.isEmpty())
         return QString();
 
-    QString cls;
-    if (d.format)
-    {
-        cls = "message";
-        if (d.highlight)
-            cls = "highlight";
-        else if (formatted.startsWith("!"))
-            cls = "event";
-        else if (formatted.startsWith("?"))
-            cls = "notice";
-        else if (formatted.startsWith("["))
-            cls = "notice";
-        else if (formatted.startsWith("*"))
-            cls = "action";
-    }
+    QString format = d.messageFormat;
+    if (d.highlight && !d.highlightFormat.isEmpty())
+        format = d.highlightFormat;
+    else
+        format = d.prefixedFormats.value(formatted.left(1));
 
     if (d.timeStamp)
         formatted = tr("[%1] %2").arg(QTime::currentTime().toString(), formatted);
 
-    if (!cls.isNull())
-        formatted = tr("<span class='%1'>%2</span>").arg(cls, formatted);
+    if (!format.isNull())
+        formatted = tr("<span %1>%2</span>").arg(format, formatted);
 
     return formatted;
 }
@@ -204,7 +269,7 @@ QString MessageFormatter::formatNumericMessage(IrcNumericMessage* message) const
 {
     if (message->code() < 300)
         return tr("[INFO] %1").arg(IrcUtil::messageToHtml(MID_(1)));
-    if (message->code() > 399)
+    if (QByteArray(Irc::toString(message->code())).startsWith("ERR_"))
         return tr("[ERROR] %1").arg(IrcUtil::messageToHtml(MID_(1)));
 
     switch (message->code())
@@ -213,18 +278,18 @@ QString MessageFormatter::formatNumericMessage(IrcNumericMessage* message) const
     case Irc::RPL_MOTD:
         return tr("[MOTD] %1").arg(IrcUtil::messageToHtml(MID_(1)));
     case Irc::RPL_AWAY:
+        return tr("! %1 is away (%2)").arg(P_(1), MID_(2));
     case Irc::RPL_WHOISOPERATOR:
-    case 310: // "is available for help"
-    case 320: // "is identified to services"
-    case 671: // nick is using a secure connection
-        return tr("! %1 %2").arg(message->sender().name(), message->parameters().join(" "));
-    case 378: // nick is connecting from <...>
+    case Irc::RPL_WHOISHELPOP: // "is available for help"
+    case Irc::RPL_WHOISSPECIAL: // "is identified to services"
+    case Irc::RPL_WHOISSECURE: // nick is using a secure connection
+    case Irc::RPL_WHOISHOST: // nick is connecting from <...>
         return tr("! %1").arg(MID_(1));
     case Irc::RPL_WHOISUSER:
         return tr("! %1 is %2@%3 (%4)").arg(P_(1), P_(2), P_(3), IrcUtil::messageToHtml(MID_(5)));
     case Irc::RPL_WHOISSERVER:
         return tr("! %1 is online via %2 (%3)").arg(P_(1), P_(2), P_(3));
-    case 330: // nick user is logged in as
+    case Irc::RPL_WHOISACCOUNT: // nick user is logged in as
         return tr("! %1 %3 %2").arg(P_(1), P_(2), P_(3));
     case Irc::RPL_WHOWASUSER:
         return tr("! %1 was %2@%3 %4 %5").arg(P_(1), P_(2), P_(3), P_(4), P_(5));
@@ -237,9 +302,9 @@ QString MessageFormatter::formatNumericMessage(IrcNumericMessage* message) const
         return tr("! %1 is on channels %2").arg(P_(1), P_(2));
     case Irc::RPL_CHANNELMODEIS:
         return tr("! %1 mode is %2").arg(P_(1), P_(2));
-    case Irc::RPL_CHANNELURL:
+    case Irc::RPL_CHANNEL_URL:
         return tr("! %1 url is %2").arg(P_(1), IrcUtil::messageToHtml(P_(2)));
-    case Irc::RPL_CHANNELCREATED: {
+    case Irc::RPL_CREATIONTIME: {
         QDateTime dateTime = QDateTime::fromTime_t(P_(2).toInt());
         return tr("! %1 was created %2").arg(P_(1), dateTime.toString());
     }
@@ -247,7 +312,7 @@ QString MessageFormatter::formatNumericMessage(IrcNumericMessage* message) const
         return tr("! %1 has no topic set").arg(P_(1));
     case Irc::RPL_TOPIC:
         return tr("! %1 topic is \"%2\"").arg(P_(1), IrcUtil::messageToHtml(P_(2)));
-    case Irc::RPL_TOPICSET: {
+    case Irc::RPL_TOPICWHOTIME: {
         QDateTime dateTime = QDateTime::fromTime_t(P_(3).toInt());
         return tr("! %1 topic was set %2 by %3").arg(P_(1), dateTime.toString(), P_(2));
     }
@@ -267,25 +332,8 @@ QString MessageFormatter::formatNumericMessage(IrcNumericMessage* message) const
         return QString();
 
     case Irc::RPL_ENDOFNAMES: {
-        QString msg;
-        if (d.firstNames)
-            msg = tr("! %1 has %2 users").arg(P_(1)).arg(d.names.count());
-        else
-            msg = tr("! %1 users (%3): %2").arg(P_(1), prettyNames(d.names, 6)).arg(d.names.count());
-        d.firstNames = false;
+        QString msg = tr("! %1 has %2 users").arg(P_(1)).arg(d.names.count());
         d.names.clear();
-        return msg;
-    }
-
-    case Irc::RPL_WHOREPLY: {
-        QString info = QStringList(message->parameters().mid(6)).join(" ");
-        d.who.append(tr("%1!%2@%3 via %4 (%5)").arg(P_(5), P_(2), P_(3), P_(4), info));
-        return QString();
-    }
-
-    case Irc::RPL_ENDOFWHO: {
-        QString msg = tr("! '%1' users: %2").arg(P_(1), prettyNames(d.who, 1));
-        d.who.clear();
         return msg;
     }
 
@@ -356,44 +404,6 @@ QString MessageFormatter::formatPingReply(const IrcSender& sender, const QString
         return tr("! %1 replied in %2s").arg(prettyUser(sender), result);
     }
     return QString();
-}
-
-static bool nameLessThan(const QString &n1, const QString &n2)
-{
-    const bool o1 = n1.startsWith("@");
-    const bool o2 = n2.startsWith("@");
-
-    if (o1 && !o2)
-        return true;
-    if (!o1 && o2)
-        return false;
-
-    const bool v1 = n1.startsWith("+");
-    const bool v2 = n2.startsWith("+");
-
-    if (v1 && !v2 && !o2)
-        return true;
-    if (!v1 && !o1 && v2)
-        return false;
-
-    return QString::localeAwareCompare(n1.toLower(), n2.toLower()) < 0;
-}
-
-QString MessageFormatter::prettyNames(QStringList names, int columns)
-{
-    qSort(names.begin(), names.end(), nameLessThan);
-
-    QString message;
-    message += "<table>";
-    for (int i = 0; i < names.count(); i += columns)
-    {
-        message += "<tr>";
-        for (int j = 0; j < columns; ++j)
-            message += "<td>" + colorize(names.value(i+j)) + "&nbsp;</td>";
-        message += "</tr>";
-    }
-    message += "</table>";
-    return message;
 }
 
 QString MessageFormatter::prettyUser(const IrcSender& sender)

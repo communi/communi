@@ -21,7 +21,6 @@
 
 MessageHandler::MessageHandler(QObject* parent) : QObject(parent)
 {
-    d.qml = false;
     d.session = 0;
     d.defaultReceiver = 0;
     d.currentReceiver = 0;
@@ -34,17 +33,8 @@ MessageHandler::~MessageHandler()
     d.currentReceiver = 0;
     d.receivers.clear();
     d.channelUsers.clear();
-    d.session->socket()->waitForDisconnected(500);
-}
-
-bool MessageHandler::isQml() const
-{
-    return d.qml;
-}
-
-void MessageHandler::setQml(bool qml)
-{
-    d.qml = qml;
+    if (d.session && d.session->isActive())
+        d.session->socket()->waitForDisconnected(500);
 }
 
 IrcSession* MessageHandler::session() const
@@ -60,10 +50,8 @@ void MessageHandler::setSession(IrcSession* session)
             disconnect(d.session, SIGNAL(messageReceived(IrcMessage*)), this, SLOT(handleMessage(IrcMessage*)));
 
         if (session)
-        {
-            session->setParent(this);
             connect(session, SIGNAL(messageReceived(IrcMessage*)), this, SLOT(handleMessage(IrcMessage*)));
-        }
+
         d.session = session;
     }
 }
@@ -103,8 +91,8 @@ void MessageHandler::removeReceiver(const QString& name)
     const QString lower = name.toLower();
     if (d.receivers.contains(lower))
     {
-        emit receiverToBeRemoved(name);
         d.receivers.remove(name.toLower());
+        emit receiverToBeRemoved(name);
     }
 }
 
@@ -217,13 +205,13 @@ void MessageHandler::handleNumericMessage(IrcNumericMessage* message)
     case Irc::RPL_NOWAWAY:
     case Irc::RPL_AWAY:
     case Irc::RPL_WHOISOPERATOR:
-    case 310: // "is available for help"
-    case 320: // "is identified to services"
-    case 378: // nick is connecting from <...>
-    case 671: // nick is using a secure connection
+    case Irc::RPL_WHOISHELPOP: // "is available for help"
+    case Irc::RPL_WHOISSPECIAL: // "is identified to services"
+    case Irc::RPL_WHOISHOST: // nick is connecting from <...>
+    case Irc::RPL_WHOISSECURE: // nick is using a secure connection
     case Irc::RPL_WHOISUSER:
     case Irc::RPL_WHOISSERVER:
-    case 330: // nick user is logged in as
+    case Irc::RPL_WHOISACCOUNT: // nick user is logged in as
     case Irc::RPL_WHOWASUSER:
     case Irc::RPL_WHOISIDLE:
     case Irc::RPL_WHOISCHANNELS:
@@ -247,20 +235,24 @@ void MessageHandler::handleNumericMessage(IrcNumericMessage* message)
 
     case Irc::RPL_ENDOFNAMES:
     case Irc::RPL_CHANNELMODEIS:
-    case Irc::RPL_CHANNELURL:
-    case Irc::RPL_CHANNELCREATED:
+    case Irc::RPL_CHANNEL_URL:
+    case Irc::RPL_CREATIONTIME:
     case Irc::RPL_NOTOPIC:
     case Irc::RPL_TOPIC:
-    case Irc::RPL_TOPICSET:
+    case Irc::RPL_TOPICWHOTIME:
         sendMessage(message, message->parameters().value(1));
         break;
 
     case Irc::RPL_NAMREPLY: {
         const int count = message->parameters().count();
         const QString channel = message->parameters().value(count - 2);
-        const QStringList nicks = message->parameters().value(count - 1).split(" ", QString::SkipEmptyParts);
-        foreach (const QString& nick, nicks)
-            d.addChannelUser(channel, nick);
+        const QStringList names = message->parameters().value(count - 1).split(" ", QString::SkipEmptyParts);
+        foreach (QString name, names)
+        {
+            if (name.startsWith("@") || name.startsWith("+"))
+                name.remove(0, 1);
+            d.addChannelUser(channel, name);
+        }
         sendMessage(message, channel);
         break;
         }
@@ -323,12 +315,10 @@ void MessageHandler::handleUnknownMessage(IrcMessage* message)
 
 void MessageHandler::sendMessage(IrcMessage* message, QObject* receiver)
 {
-    if (d.qml)
-        // QML: QVariant(QObject*)
-        QMetaObject::invokeMethod(receiver, "receiveMessage", Q_ARG(QVariant, QVariant::fromValue((QObject*) message)));
-    else
-        // C++: IrcMessage*
-        QMetaObject::invokeMethod(receiver, "receiveMessage", Q_ARG(IrcMessage*, message));
+    QMetaObject::invokeMethod(receiver, "receiveMessage", Q_ARG(IrcMessage*, message));
+
+    // if the receiver was a QML element, argument type would be QVariant(QObject*):
+    // QMetaObject::invokeMethod(receiver, "receiveMessage", Q_ARG(QVariant, QVariant::fromValue((QObject*) message)));
 }
 
 void MessageHandler::sendMessage(IrcMessage* message, const QString& receiver)
@@ -338,6 +328,11 @@ void MessageHandler::sendMessage(IrcMessage* message, const QString& receiver)
     QObject* object = getReceiver(receiver);
     Q_ASSERT(object);
     sendMessage(message, object);
+}
+
+void MessageHandler::onSessionDestroyed()
+{
+    setSession(0);
 }
 
 QStringList MessageHandler::Private::userChannels(const QString& user) const
@@ -350,28 +345,26 @@ QStringList MessageHandler::Private::userChannels(const QString& user) const
     return channels;
 }
 
-void MessageHandler::Private::addChannelUser(const QString& channel, const QString& user)
+void MessageHandler::Private::addChannelUser(QString channel, const QString& user)
 {
-    channelUsers[channel.toLower()].insert(user.toLower());
-    QObject* receiver = receivers.value(channel.toLower());
-    if (receiver)
+    channel = channel.toLower();
+    if (!channelUsers.value(channel).contains(user.toLower()))
     {
-        if (qml)
-            QMetaObject::invokeMethod(receiver, "addUser", Q_ARG(QVariant, user));
-        else
+        channelUsers[channel].insert(user.toLower());
+        QObject* receiver = receivers.value(channel);
+        if (receiver)
             QMetaObject::invokeMethod(receiver, "addUser", Q_ARG(QString, user));
     }
 }
 
-void MessageHandler::Private::removeChannelUser(const QString& channel, const QString& user)
+void MessageHandler::Private::removeChannelUser(QString channel, const QString& user)
 {
-    channelUsers[channel.toLower()].remove(user.toLower());
-    QObject* receiver = receivers.value(channel.toLower());
-    if (receiver)
+    channel = channel.toLower();
+    if (channelUsers.value(channel).contains(user.toLower()))
     {
-        if (qml)
-            QMetaObject::invokeMethod(receiver, "removeUser", Q_ARG(QVariant, user));
-        else
+        channelUsers[channel].remove(user.toLower());
+        QObject* receiver = receivers.value(channel);
+        if (receiver)
             QMetaObject::invokeMethod(receiver, "removeUser", Q_ARG(QString, user));
     }
 }

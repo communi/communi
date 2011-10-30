@@ -3,11 +3,12 @@
 ######################################################################
 
 TEMPLATE = subdirs
-SUBDIRS += src plugins examples tests
+SUBDIRS += src plugins examples
+!contains(MEEGO_EDITION,harmattan):SUBDIRS += tests
 CONFIG += ordered
 
-lessThan(QT_MAJOR_VERSION, 4) | lessThan(QT_MINOR_VERSION, 7) {
-    error(Communi requires Qt 4.7 or newer but Qt $$[QT_VERSION] was detected.)
+lessThan(QT_MAJOR_VERSION, 4) | lessThan(QT_MINOR_VERSION, 6) {
+    error(Communi requires Qt 4.6 or newer but Qt $$[QT_VERSION] was detected.)
 }
 
 static {
@@ -25,9 +26,25 @@ OTHER_FILES += README
 OTHER_FILES += TODO
 OTHER_FILES += VERSION
 
+contains(MEEGO_EDITION,harmattan) {
+    OTHER_FILES += qtc_packaging/debian_harmattan/rules
+    OTHER_FILES += qtc_packaging/debian_harmattan/README
+    OTHER_FILES += qtc_packaging/debian_harmattan/manifest.aegis
+    OTHER_FILES += qtc_packaging/debian_harmattan/copyright
+    OTHER_FILES += qtc_packaging/debian_harmattan/control
+    OTHER_FILES += qtc_packaging/debian_harmattan/compat
+    OTHER_FILES += qtc_packaging/debian_harmattan/changelog
+}
+
+contains(MEEGO_EDITION,harmattan) {
+    COMMUNI_INSTALL_FEATURES = /usr/share/qt4/mkspecs
+} else {
+    COMMMUNI_INSTALL_FEATURES = $$[QMAKE_MKSPECS]
+}
+
 mkspecs.files += features/communi.prf
 mkspecs.files += features/communi-config.prf
-mkspecs.path = $$[QMAKE_MKSPECS]/features
+mkspecs.path = $$COMMMUNI_INSTALL_FEATURES/features
 INSTALLS += mkspecs
 
 symbian {
@@ -36,6 +53,7 @@ symbian {
     BLD_INF_RULES.prj_exports += "features/communi-config.prf $$mkspecs.path/communi-config.prf"
 }
 
+include(version.pri)
 !build_pass {
     macx {
         !qt_no_framework {
@@ -53,4 +71,8 @@ symbian {
         message(ICU support disabled.)
         system(echo CONFIG+=no_icu >> .qmake.cache)
     }
+}
+
+lessThan(QT_MAJOR_VERSION, 4) | lessThan(QT_MINOR_VERSION, 7) {
+    message(Declarative support disabled. Use Qt 4.7 or later to enable declarative support.)
 }

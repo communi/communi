@@ -2,6 +2,8 @@
 # Communi
 ######################################################################
 
+!verbose:!symbian:CONFIG += silent
+
 INCLUDEPATH += $$PWD/../include
 DEPENDPATH += $$PWD/../include
 
@@ -16,3 +18,5 @@ macx:!qt_no_framework {
     TEMPLATE -= fakelib
     QMAKE_RPATHDIR += $$PWD/../lib
 }
+
+!no_icu:include(../icu.pri)

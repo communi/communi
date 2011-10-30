@@ -15,32 +15,58 @@
 #ifndef MESSAGEFORMATTER_H
 #define MESSAGEFORMATTER_H
 
+#include <QHash>
 #include <QObject>
 #include <IrcMessage>
 
 class MessageFormatter : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QStringList highlights READ highlights WRITE setHightlights)
+    Q_PROPERTY(QStringList highlights READ highlights WRITE setHighlights)
     Q_PROPERTY(bool timeStamp READ timeStamp WRITE setTimeStamp)
-    Q_PROPERTY(bool classFormat READ classFormat WRITE setClassFormat)
+
+    Q_PROPERTY(QString messageFormat READ messageFormat WRITE setMessageFormat)
+    Q_PROPERTY(QString eventFormat READ eventFormat WRITE setEventFormat)
+    Q_PROPERTY(QString noticeFormat READ noticeFormat WRITE setNoticeFormat)
+    Q_PROPERTY(QString actionFormat READ actionFormat WRITE setActionFormat)
+    Q_PROPERTY(QString unknownFormat READ unknownFormat WRITE setUnknownFormat)
+    Q_PROPERTY(QString highlightFormat READ highlightFormat WRITE setHighlightFormat)
 
 public:
     explicit MessageFormatter(QObject* parent = 0);
     virtual ~MessageFormatter();
 
     QStringList highlights() const;
-    void setHightlights(const QStringList& highlights);
+    void setHighlights(const QStringList& highlights);
 
     bool timeStamp() const;
     void setTimeStamp(bool timeStamp);
 
-    // a workaround for QML Text Element bug: (TODO: QTBUG-XXXXX)
-    // nested <span style="color:foo"/> elements cause extra line breaks
-    bool classFormat() const;
-    void setClassFormat(bool format);
+    QString messageFormat() const;
+    void setMessageFormat(const QString& format);
+
+    QString eventFormat() const;
+    void setEventFormat(const QString& format);
+
+    QString noticeFormat() const;
+    void setNoticeFormat(const QString& format);
+
+    QString actionFormat() const;
+    void setActionFormat(const QString& format);
+
+    QString unknownFormat() const;
+    void setUnknownFormat(const QString& format);
+
+    QString highlightFormat() const;
+    void setHighlightFormat(const QString& format);
+
+    QStringList currentNames() const;
 
     Q_INVOKABLE QString formatMessage(IrcMessage* message) const;
+
+    static QString prettyUser(const IrcSender& sender);
+    static QString prettyUser(const QString& user);
+    static QString colorize(const QString& str);
 
 protected:
     QString formatInviteMessage(IrcInviteMessage* message) const;
@@ -58,21 +84,17 @@ protected:
     QString formatUnknownMessage(IrcMessage* message) const;
 
     static QString formatPingReply(const IrcSender& sender, const QString& arg);
-    static QString prettyNames(QStringList names, int columns);
-    static QString prettyUser(const IrcSender& sender);
-    static QString prettyUser(const QString& user);
-    static QString colorize(const QString& str);
 
 private:
     mutable struct Private
     {
-        bool format;
         bool highlight;
         QStringList highlights;
         bool timeStamp;
-        bool firstNames;
         QStringList names;
-        QStringList who;
+        QString messageFormat;
+        QString highlightFormat;
+        QHash<QString, QString> prefixedFormats;
     } d;
 };
 
