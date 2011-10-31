@@ -66,28 +66,18 @@ PageStackWindow {
 
             Component {
                 id: sessionComponent
-                Session {
-                    id: session
-                    property string channel
-                    onConnected: {
-                        if (channel.length) {
-                            var cmd = ircCommand.createJoin(channel);
-                            session.sendCommand(cmd);
-                        }
-                    }
-                }
+                Session { }
             }
 
             onAccepted: {
                 var session = sessionComponent.createObject(window);
-                session.userName = "communi";
                 session.nickName = connectionSheet.name;
                 session.realName = connectionSheet.name;
                 session.host = connectionSheet.host;
                 session.port = connectionSheet.port;
-                session.channel = connectionSheet.channel;
                 session.password = connectionSheet.password;
                 session.secure = connectionSheet.secure;
+                session.autoJoinChannels = connectionSheet.channel;
                 SessionManager.addSession(session);
 
                 connectionSheet.password = "";
@@ -124,4 +114,7 @@ PageStackWindow {
             }
         }
     }
+
+    Component.onCompleted: SessionManager.restore()
+    Component.onDestruction: SessionManager.save()
 }
