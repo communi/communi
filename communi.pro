@@ -7,7 +7,7 @@ SUBDIRS += src plugins examples
 !contains(MEEGO_EDITION,harmattan):SUBDIRS += tests
 CONFIG += ordered
 
-lessThan(QT_MAJOR_VERSION, 4) | lessThan(QT_MINOR_VERSION, 6) {
+lessThan(QT_MAJOR_VERSION, 4) && lessThan(QT_MINOR_VERSION, 6) {
     error(Communi requires Qt 4.6 or newer but Qt $$[QT_VERSION] was detected.)
 }
 
@@ -77,6 +77,6 @@ include(version.pri)
     }
 }
 
-lessThan(QT_MAJOR_VERSION, 4) | lessThan(QT_MINOR_VERSION, 7) {
+lessThan(QT_MAJOR_VERSION, 4) && lessThan(QT_MINOR_VERSION, 7) {
     message(Declarative support disabled. Use Qt 4.7 or later to enable declarative support.)
 }

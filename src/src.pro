@@ -5,7 +5,11 @@
 TEMPLATE = lib
 TARGET = $$qtLibraryTarget(Communi)
 DEFINES += BUILD_COMMUNI
-QT = core network
+if (lessThan(QT_MAJOR_VERSION, 5)) {
+   QT = core network
+} else {
+   QT = core network
+}
 !verbose:!symbian:CONFIG += silent
 win32|mac:!wince*:!win32-msvc:!macx-xcode:CONFIG += debug_and_release build_all
 
