@@ -3,9 +3,30 @@
 ######################################################################
 
 TEMPLATE = subdirs
-SUBDIRS += src plugins examples
-!contains(MEEGO_EDITION,harmattan):SUBDIRS += tests
 CONFIG += ordered
+SUBDIRS += src
+
+!no_plugins {
+    SUBDIRS += plugins
+} else {
+    message(Plugins disabled)
+}
+
+!no_tests {
+    !contains(MEEGO_EDITION,harmattan) {
+        SUBDIRS += tests
+    } else {
+        message(Tests not supported in Meego Harmattan)
+    }
+} else {
+    message(Tests disabled)
+}
+
+!no_examples {
+    SUBDIRS += examples
+} else {
+    message(Examples disabled)
+}
 
 lessThan(QT_MAJOR_VERSION, 4) && lessThan(QT_MINOR_VERSION, 6) {
     error(Communi requires Qt 4.6 or newer but Qt $$[QT_VERSION] was detected.)
