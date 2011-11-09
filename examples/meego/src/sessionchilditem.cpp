@@ -65,7 +65,10 @@ void SessionChildItem::receiveMessage(IrcMessage* message)
         }
 
         if (!alertText.isEmpty())
+        {
             setAlertText(alertText);
+            emit alert(this);
+        }
 
         if (!isCurrent())
             setUnread(unread() + 1);
@@ -73,15 +76,17 @@ void SessionChildItem::receiveMessage(IrcMessage* message)
     else if (message->type() == IrcMessage::Numeric)
     {
         IrcNumericMessage* numMsg = static_cast<IrcNumericMessage*>(message);
-        if (numMsg->code() == Irc::RPL_TOPIC)
+        if (isChannel() && numMsg->code() == Irc::RPL_TOPIC)
             setSubtitle(numMsg->parameters().value(2));
+        else if (!isChannel() && numMsg->code() == Irc::RPL_WHOISUSER)
+            setSubtitle(numMsg->parameters().value(5));
     }
 }
 
 void SessionChildItem::close()
 {
     if (isChannel())
-        m_parent->session()->sendCommand(IrcCommand::createPart(title(), "Communi 1.0.0 for MeeGo"));
+        m_parent->session()->sendCommand(IrcCommand::createPart(title(), "Communi 1.0.0 for N9"));
     m_parent->removeChild(title());
 }
 

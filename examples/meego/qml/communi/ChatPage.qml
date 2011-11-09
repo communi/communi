@@ -24,8 +24,20 @@ CommonPage {
 
     function sendMessage(receiver, message) {
         var cmd = CommandParser.parseCommand(receiver, message);
-        if (cmd && modelData)
-            modelData.sendCommand(cmd);
+        if (cmd && modelData) {
+            modelData.session.sendCommand(cmd);
+            if (cmd.type == IrcCommand.Message || cmd.type == IrcCommand.CtcpAction) {
+                var msg = ircMessage.fromCommand(modelData.session.nickName, cmd);
+                modelData.receiveMessage(msg);
+                msg.destroy();
+            }
+        }
+    }
+
+    // TODO: how to make it possible to access both Message.Type and
+    //       Message.fromCommand() without creating a dummy instance?
+    IrcMessage {
+        id: ircMessage
     }
 
     title: modelData ? modelData.title : ""
@@ -33,6 +45,23 @@ CommonPage {
         ToolIcon {
             iconId: "toolbar-back"
             onClicked: root.pageStack.pop()
+        }
+        ToolIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: modelData !== null && modelData.channel !== undefined && !indicator.visible
+            iconId: "toolbar-list"
+            onClicked: {
+                var cmd = modelData.channel ? ircCommand.createNames(modelData.title)
+                                            : ircCommand.createWhois(modelData.title);
+                modelData.sendUiCommand(cmd);
+                indicator.visible = true;
+            }
+        }
+        BusyIndicator {
+            id: indicator
+            visible: false
+            running: visible
+            anchors.verticalCenter: parent.verticalCenter
         }
         ToolIcon {
             iconId: "toolbar-new-message"
@@ -44,23 +73,36 @@ CommonPage {
     }
 
     onModelDataChanged: {
-        listView.currentIndex = -1;
+        //listView.currentIndex = -1;
         if (modelData) {
             listView.model = modelData.messages;
-            listView.currentIndex = listView.count - modelData.unseen - 1;
+            //listView.currentIndex = listView.count - modelData.unseen - 1;
             Completer.modelItem = modelData;
         }
     }
 
     SelectionDialog {
         id: dialog
+        model: ListModel { }
+        property bool names: false
+        function setContent(content) {
+            dialog.model.clear();
+            dialog.selectedIndex = -1;
+            for (var i = 0; i < content.length; ++i)
+                dialog.model.append({"name": content[i]});
+            indicator.visible = false;
+        }
         titleText: modelData ? modelData.title : ""
         onAccepted: {
-            var name = model.get(selectedIndex).name;
-            while (name.length && name[0] == "@" || name[0] == "+")
-                name = name.slice(1);
-            bounceItem = modelData.sessionItem.addChild(name);
-            pageStack.pop();
+            if (names) {
+                var name = model.get(selectedIndex).name;
+                while (name.length && name[0] == "@" || name[0] == "+")
+                    name = name.slice(1);
+
+                var child = modelData.sessionItem.addChild(name);
+                var cmd = ircCommand.createWhois(name);
+                bouncer.bounce(child, cmd);
+            }
         }
     }
 
@@ -68,13 +110,16 @@ CommonPage {
         target: modelData
         onRemoved: page.pageStack.pop()
         onNamesReceived: {
-            dialog.model.clear();
-            for (var i = 0; i < names.length; ++i)
-                dialog.model.append({"name": names[i]});
+            dialog.setContent(names);
+            dialog.names = true;
+            dialog.open();
+        }
+        onWhoisReceived: {
+            dialog.setContent(whois);
+            dialog.names = false;
             dialog.open();
         }
     }
-    onBannerClicked: pageStack.pop()
 
     ListView {
         id: listView
@@ -93,25 +138,36 @@ CommonPage {
             text: display
             width: listView.width
             wrapMode: Text.Wrap
-            onLinkActivated: Qt.openUrlExternally(link)
+            onLinkActivated: {
+                page.busy = true;
+                Qt.openUrlExternally(link);
+            }
+        }
+
+        Connections {
+            target: Qt.application
+            onActiveChanged: {
+                if (!Qt.application.active)
+                    page.busy = false;
+            }
         }
 
         onHeightChanged: if (!positioner.running) positioner.start()
         onCountChanged: {
             if (!positioner.running) positioner.start();
-            if (currentIndex == -1) currentIndex = count - 2;
+            //if (currentIndex == -1) currentIndex = count - 2;
         }
 
-        highlight: Item {
-            y: listView.currentItem !== null ? listView.currentItem.y : 0
-            visible: listView.currentItem !== null && listView.currentIndex < listView.count - 1
-            Rectangle {
-                width: listView.width
-                height: 1
-                color: "red"
-                anchors.bottom: parent.bottom
-            }
-        }
+//        highlight: Item {
+//            y: listView.currentItem !== null ? listView.currentItem.y : 0
+//            visible: listView.currentItem !== null && listView.currentIndex < listView.count - 1
+//            Rectangle {
+//                width: listView.width
+//                height: 1
+//                color: "red"
+//                anchors.bottom: parent.bottom
+//            }
+//        }
     }
 
     ScrollDecorator {
@@ -129,8 +185,12 @@ CommonPage {
         id: textField
         height: 0
         visible: false
-        inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
-        platformSipAttributes: SipAttributes { actionKeyHighlighted: true }
+        inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhUrlCharactersOnly
+        platformSipAttributes: SipAttributes {
+            actionKeyHighlighted: true
+            actionKeyLabel: qsTr("Send")
+            actionKeyEnabled: textField.text.length
+        }
 
         anchors {
             left: parent.left

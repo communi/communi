@@ -20,7 +20,18 @@ PageStackWindow {
     id: window
 
     initialPage: MainPage {
-        title: qsTr("Communi")
+        id: page
+
+        title: {
+            if (connectionSheet.status === DialogStatus.Open)
+                return qsTr("Add connection");
+            if (channelSheet.status === DialogStatus.Open)
+                return qsTr("Join channel");
+            if (querySheet.status === DialogStatus.Open)
+                return qsTr("Open query");
+            return qsTr("Communi");
+        }
+
         tools: ToolBarLayout {
             id: tools
             visible: sheet.status == DialogStatus.Closed
@@ -30,6 +41,9 @@ PageStackWindow {
                 onClicked: SessionModel.length ? menu.open() : connectionSheet.open()
             }
         }
+        obscured: connectionSheet.status == DialogStatus.Open || connectionSheet.status == DialogStatus.Opening
+                  || channelSheet.status !== DialogStatus.Closed || channelSheet.status == DialogStatus.Opening
+                  || querySheet.status !== DialogStatus.Closed || querySheet.status == DialogStatus.Opening
 
         Menu {
             id: menu
@@ -89,34 +103,36 @@ PageStackWindow {
             }
         }
 
-        ChatSheet {
-            id: channelSheet
-            value: "#"
-            titleText: qsTr("Join channel")
-            description: qsTr("Channel")
-            onValueChanged: {
-                acceptable = value.length > 1 && (value[0] == "#" || value[0] == "&");
+        Connections {
+            target: SessionManager
+            onChannelKeyRequired: {
+                channelSheet.channel = channel;
+                channelSheet.passwordRequired = true;
+                channelSheet.open();
             }
+        }
+
+        ChannelSheet {
+            id: channelSheet
             onAccepted: {
-                var item = SessionModel[channelSheet.session];
+                var item = SessionModel[channelSheet.sessionIndex];
                 if (item) {
-                    var cmd = ircCommand.createJoin(channelSheet.value);
-                    item.session.sendCommand(cmd);
+                    var child = item.addChild(channelSheet.channel);
+                    var cmd = ircCommand.createJoin(channelSheet.channel, channelSheet.password);
+                    page.bouncer.bounce(child, cmd);
                 }
             }
         }
 
-        ChatSheet {
+        QuerySheet {
             id: querySheet
-            titleText: qsTr("Open query")
-            description: qsTr("User")
-            onValueChanged: {
-                acceptable = value.length;
-            }
             onAccepted: {
-                var item = SessionModel[querySheet.session];
-                if (item)
-                    item.addChild(querySheet.value);
+                var item = SessionModel[querySheet.sessionIndex];
+                if (item) {
+                    var child = item.addChild(querySheet.name);
+                    var cmd = ircCommand.createWhois(querySheet.name);
+                    page.bouncer.bounce(child, cmd);
+                }
             }
         }
     }

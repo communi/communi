@@ -13,13 +13,14 @@
 */
 
 #include "abstractsessionitem.h"
+#include <QDateTime>
 #include <IrcSession>
 #include <IrcMessage>
 #include <Irc>
 
 AbstractSessionItem::AbstractSessionItem(QObject *parent) :
     QObject(parent), m_session(0), m_busy(false), m_current(false),
-    m_highlighted(false), m_unread(false), m_unseen(false)
+    m_highlighted(false), m_unread(false) //, m_unseen(false)
 {
     m_messages = new QStringListModel(this);
     m_formatter.setTimeStamp(true);
@@ -114,10 +115,10 @@ void AbstractSessionItem::setCurrent(bool current)
         setHighlighted(false);
         setUnread(0);
     }
-    else
-    {
-        setUnseen(0);
-    }
+//    else
+//    {
+//        setUnseen(0);
+//    }
 
     if (m_current != current)
     {
@@ -155,19 +156,19 @@ void AbstractSessionItem::setUnread(int unread)
     }
 }
 
-int AbstractSessionItem::unseen() const
-{
-    return m_unseen;
-}
+//int AbstractSessionItem::unseen() const
+//{
+//    return m_unseen;
+//}
 
-void AbstractSessionItem::setUnseen(int unseen)
-{
-    if (!m_current && m_unseen != unseen)
-    {
-        m_unseen = unseen;
-        emit unseenChanged();
-    }
-}
+//void AbstractSessionItem::setUnseen(int unseen)
+//{
+//    if (!m_current && m_unseen != unseen)
+//    {
+//        m_unseen = unseen;
+//        emit unseenChanged();
+//    }
+//}
 
 QString AbstractSessionItem::alertText() const
 {
@@ -176,11 +177,7 @@ QString AbstractSessionItem::alertText() const
 
 void AbstractSessionItem::setAlertText(const QString& text)
 {
-    if (m_alertText != text)
-    {
-        m_alertText = text;
-        emit alert(this);
-    }
+    m_alertText = text;
 }
 
 QStringList AbstractSessionItem::users() const
@@ -205,16 +202,10 @@ void AbstractSessionItem::removeUser(const QString& user)
     emit usersChanged();
 }
 
-void AbstractSessionItem::sendCommand(IrcCommand *command)
+void AbstractSessionItem::sendUiCommand(IrcCommand *command)
 {
     m_sent.insert(command->type());
     m_session->sendCommand(command);
-    if (command->type() == IrcCommand::Message || command->type() == IrcCommand::CtcpAction)
-    {
-        IrcMessage* message = IrcMessage::fromCommand(m_session->nickName(), command);
-        receiveMessage(message);
-        message->deleteLater();
-    }
 }
 
 void AbstractSessionItem::receiveMessage(IrcMessage* message)
@@ -222,12 +213,65 @@ void AbstractSessionItem::receiveMessage(IrcMessage* message)
     if (message->type() == IrcMessage::Numeric)
     {
         IrcNumericMessage* numeric = static_cast<IrcNumericMessage*>(message);
-        if (numeric->code() == Irc::RPL_ENDOFNAMES && m_sent.contains(IrcCommand::Names))
+        switch (numeric->code())
         {
-            emit namesReceived(m_formatter.currentNames());
-            m_sent.remove(IrcCommand::Names);
-            m_formatter.formatMessage(message);
+        case Irc::RPL_ENDOFNAMES:
+            if (m_sent.contains(IrcCommand::Names))
+            {
+                emit namesReceived(m_formatter.currentNames());
+                m_sent.remove(IrcCommand::Names);
+                m_formatter.formatMessage(message);
+                return;
+            }
+            break;
+        case Irc::RPL_WHOISUSER:
+            if (m_sent.contains(IrcCommand::Whois))
+            {
+                m_whois.append(tr("Ident: %1").arg(message->parameters().value(2)));
+                m_whois.append(tr("Host: %1").arg(message->parameters().value(3)));
+                m_whois.append(tr("Name: %1").arg(message->parameters().value(5)));
+                return;
+            }
+            break;
+        case Irc::RPL_WHOISSERVER:
+            if (m_sent.contains(IrcCommand::Whois))
+            {
+                m_whois.append(tr("Server: %1 (%2)").arg(message->parameters().value(2), message->parameters().value(3)));
+                return;
+            }
+            break;
+        case Irc::RPL_WHOISIDLE:
+            if (m_sent.contains(IrcCommand::Whois))
+            {
+                QDateTime signon = QDateTime::fromTime_t(message->parameters().value(3).toInt());
+                QTime idle = QTime().addSecs(message->parameters().value(2).toInt());
+                m_whois.append(tr("Connected: %1").arg(signon.toString()));
+                m_whois.append(tr("Idle: %1").arg(idle.toString()));
+                return;
+            }
+            break;
+        case Irc::RPL_WHOISCHANNELS:
+            if (m_sent.contains(IrcCommand::Whois))
+            {
+                m_whois.append(tr("Channels: %1").arg(message->parameters().value(2)));
+                return;
+            }
+            break;
+        case Irc::RPL_ENDOFWHOIS:
+            if (m_sent.contains(IrcCommand::Whois))
+            {
+                emit whoisReceived(m_whois);
+                m_sent.remove(IrcCommand::Whois);
+                m_whois.clear();
+            }
+        case Irc::RPL_WHOISOPERATOR:
+        case Irc::RPL_WHOISHELPOP:
+        case Irc::RPL_WHOISSPECIAL:
+        case Irc::RPL_WHOISSECURE:
+        case Irc::RPL_WHOISACCOUNT:
             return;
+        default:
+            break;
         }
     }
 
@@ -238,7 +282,7 @@ void AbstractSessionItem::receiveMessage(IrcMessage* message)
         m_messages->insertRow(index);
         m_messages->setData(m_messages->index(index), formatted);
 
-        if (!m_current)
-            setUnseen(m_unseen + 1);
+//        if (!m_current)
+//            setUnseen(m_unseen + 1);
     }
 }

@@ -20,6 +20,8 @@ import "UIConstants.js" as UI
 CommonPage {
     id: root
 
+    property alias bouncer: bouncer
+
     ListView {
         id: listView
         anchors.fill: parent
@@ -55,46 +57,78 @@ CommonPage {
         flickableItem: listView
     }
 
-    property QtObject bounceItem: null
+    Component {
+        id: bannerComponent
+        InfoBanner {
+            id: banner
+            timerShowTime: 5000
+            property QtObject item
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    bouncer.bounce(item, null);
+                    banner.hide();
+                }
+            }
+            Connections {
+                target: root.pageStack
+                onCurrentPageChanged: banner.hide()
+            }
+            onVisibleChanged: {
+                if (!banner.visible)
+                    banner.destroy();
+            }
+        }
+    }
 
     Connections {
         target: SessionManager
         onAlert: {
-            var banner = root.banner;
-            if (chatPage.status == PageStatus.Active)
-                banner = chatPage.banner;
-            bounceItem = item;
+            var banner = bannerComponent.createObject(pageStack.currentPage.header);
             banner.text = item.alertText;
+            banner.item = item;
             banner.show();
         }
     }
-
-    onBannerClicked: chatPage.push(bounceItem)
 
     ChatPage {
         id: chatPage
         function push(data) {
             modelData = data;
             root.pageStack.push(chatPage);
-            root.bounceItem = null;
         }
         onStatusChanged: {
             if (modelData)
-                modelData.current = (status == PageStatus.Active);
-            if (status == PageStatus.Inactive) {
+                modelData.current = (status !== PageStatus.Inactive);
+            if (status == PageStatus.Inactive)
                 modelData = null;
-                if (bounceItem)
-                    bounceTimer.running = true;
-            }
+            if (status == PageStatus.Inactive && bouncer.item)
+                bouncer.start();
         }
     }
 
     Timer {
-        id: bounceTimer
+        id: bouncer
         interval: 50
+        property QtObject item
+        property QtObject cmd;
+        function bounce(item, cmd) {
+            if (root.status === PageStatus.Active) {
+                chatPage.push(item);
+                if (cmd !== null)
+                    item.session.sendCommand(cmd);
+            } else {
+                bouncer.item = item;
+                bouncer.cmd = cmd;
+                pageStack.pop();
+            }
+        }
         onTriggered: {
-            if (bounceItem)
-                chatPage.push(bounceItem);
+            chatPage.push(bouncer.item)
+            if (bouncer.cmd !== null)
+                item.session.sendCommand(bouncer.cmd);
+            bouncer.item = null;
+            bouncer.cmd = null;
         }
     }
 

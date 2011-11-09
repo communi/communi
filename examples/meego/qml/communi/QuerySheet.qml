@@ -19,16 +19,15 @@ import "UIConstants.js" as UI
 CommonSheet {
     id: sheet
 
-    property alias value: valueField.text
-    property alias description: description.text
-    property int session: buttons.checkedButton ? buttons.checkedButton.idx : -1
+    property alias name: nameField.text
+    property int sessionIndex: buttons.checkedButton ? buttons.checkedButton.idx : -1
 
-    acceptable: false
-    onStatusChanged: if (status == DialogStatus.Open) valueField.forceActiveFocus()
+    acceptable: !nameField.errorHighlight
+    onStatusChanged: if (status == DialogStatus.Open) nameField.forceActiveFocus()
 
     Column {
         id: column
-        anchors.fill: parent
+        width: parent.width
         spacing: UI.DEFAULT_SPACING
 
         Label { text: qsTr("Connection"); visible: SessionModel.length > 1 }
@@ -45,12 +44,17 @@ CommonSheet {
             }
         }
 
-        Label { id: description }
         TextField {
-            id: valueField
+            id: nameField
             inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
-            errorHighlight: !sheet.acceptable
+            placeholderText: qsTr("Name")
+            errorHighlight: !text.length
             width: parent.width
+            platformSipAttributes: SipAttributes {
+                actionKeyEnabled: false
+                actionKeyHighlighted: true
+                actionKeyLabel: qsTr("Next")
+            }
         }
     }
 }

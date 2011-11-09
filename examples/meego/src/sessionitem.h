@@ -40,6 +40,7 @@ public slots:
 
 signals:
     void childItemsChanged();
+    void channelKeyRequired(const QString& channel);
 
 protected slots:
     virtual void receiveMessage(IrcMessage* message);
@@ -48,6 +49,7 @@ private slots:
     void updateState();
 
 private:
+    bool m_closing;
     QObjectList m_children;
     MessageHandler m_handler;
 };

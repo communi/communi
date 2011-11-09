@@ -20,11 +20,11 @@ import "UIConstants.js" as UI
 Page {
     id: page
 
+    property bool obscured: false
     property alias title: label.text
-    property alias banner: banner
+    property alias header: header
+    property alias busy: indicator.running
     default property alias content: content.data
-
-    signal bannerClicked
 
     Rectangle {
         id: background
@@ -54,8 +54,10 @@ Page {
         id: header
 
         width: parent.width
-        height: screen.currentOrientation == Screen.Landscape ? 46 : 72
+        height: screen.currentOrientation == Screen.Landscape || page.obscured ? 46 : 72
         source: "image://theme/meegotouch-sheet-header-background"
+
+        Behavior on height { NumberAnimation { } }
 
         border {
             top: 10
@@ -83,7 +85,17 @@ Page {
                 font.pixelSize: 32
                 font.family: "Nokia Pure Text Light"
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width // - indicator.width - UI.DEFAULT_SPACING
+                width: parent.width - indicator.width - UI.DEFAULT_SPACING
+            }
+
+            BusyIndicator {
+                id: indicator
+                visible: running
+                anchors.verticalCenter: parent.verticalCenter
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: indicator.busy = false
+                }
             }
 
 //            Image {
@@ -108,19 +120,6 @@ Page {
 //                    }
 //                }
 //            }
-        }
-
-        InfoBanner {
-            id: banner
-            timerShowTime: 5000
-            property QtObject item: null
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    page.bannerClicked();
-                    banner.hide();
-                }
-            }
         }
     }
 }
