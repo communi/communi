@@ -118,7 +118,7 @@ void MainWindow::connectToImpl(const Connection& connection)
 {
     Session* session = Session::fromConnection(connection);
     session->setEncoding(Application::encoding());
-    session->open();
+    sessionManager.addSession(session);
 
     SessionTabWidget* tab = new SessionTabWidget(session, tabWidget);
     if (connection.name.isEmpty())
@@ -141,9 +141,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
         SessionTabWidget* tab = qobject_cast<SessionTabWidget*>(tabWidget->widget(i));
         if (tab)
         {
-            Connection connection = tab->session()->toConnection();
-            connection.channels = tab->channels();
-            connections += connection;
+            connections += tab->session()->toConnection();
             tab->quit();
         }
     }

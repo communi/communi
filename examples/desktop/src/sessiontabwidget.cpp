@@ -39,7 +39,10 @@ SessionTabWidget::SessionTabWidget(Session* session, QWidget* parent) :
     connect(&d.handler, SIGNAL(receiverToBeRemoved(QString)), this, SLOT(removeView(QString)));
     connect(&d.handler, SIGNAL(receiverToBeRenamed(QString,QString)), this, SLOT(renameView(QString,QString)));
 
-    QShortcut* shortcut = new QShortcut(QKeySequence::Close, this);
+    QShortcut* shortcut = new QShortcut(QKeySequence::AddTab, this);
+    connect(shortcut, SIGNAL(activated()), this, SLOT(onNewTabRequested()));
+
+    shortcut = new QShortcut(QKeySequence::Close, this);
     connect(shortcut, SIGNAL(activated()), this, SLOT(closeCurrentView()));
 
     applySettings(Application::settings());
@@ -53,17 +56,6 @@ SessionTabWidget::SessionTabWidget(Session* session, QWidget* parent) :
 Session* SessionTabWidget::session() const
 {
     return qobject_cast<Session*>(d.handler.session());
-}
-
-QStringList SessionTabWidget::channels() const
-{
-    QStringList chans;
-    foreach (MessageView* view, d.views)
-    {
-        if (view->isChannelView())
-            chans += view->receiver();
-    }
-    return chans;
 }
 
 MessageView* SessionTabWidget::openView(const QString& receiver)
