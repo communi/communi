@@ -33,8 +33,8 @@ class AbstractSessionItem : public QObject
     Q_PROPERTY(bool busy READ isBusy WRITE setBusy NOTIFY busyChanged)
     Q_PROPERTY(bool current READ isCurrent WRITE setCurrent NOTIFY currentChanged)
     Q_PROPERTY(bool highlighted READ isHighlighted WRITE setHighlighted NOTIFY highlightedChanged)
-    Q_PROPERTY(int unread READ unread WRITE setUnread NOTIFY unreadChanged)
-//    Q_PROPERTY(int unseen READ unseen WRITE setUnseen NOTIFY unseenChanged)
+    Q_PROPERTY(int unreadCount READ unreadCount WRITE setUnreadCount NOTIFY unreadCountChanged)
+    Q_PROPERTY(int unseenIndex READ unseenIndex WRITE setUnseenIndex NOTIFY unseenIndexChanged)
     Q_PROPERTY(QStringList users READ users NOTIFY usersChanged)
     Q_PROPERTY(QString alertText READ alertText)
     Q_PROPERTY(QObject* messages READ messages)
@@ -51,8 +51,8 @@ public:
     bool isBusy() const;
     bool isCurrent() const;
     bool isHighlighted() const;
-    int unread() const;
-//    int unseen() const;
+    int unreadCount() const;
+    int unseenIndex() const;
     QString alertText() const;
 
     QStringList users() const;
@@ -67,8 +67,8 @@ public slots:
     void setBusy(bool busy);
     void setCurrent(bool current);
     void setHighlighted(bool highlighted);
-    void setUnread(int unread);
-//    void setUnseen(int unseen);
+    void setUnreadCount(int count);
+    void setUnseenIndex(int index);
     void setAlertText(const QString& text);
     void sendUiCommand(IrcCommand* command);
 
@@ -79,8 +79,8 @@ signals:
     void busyChanged();
     void currentChanged();
     void highlightedChanged();
-    void unreadChanged();
-    void unseenChanged();
+    void unreadCountChanged();
+    void unseenIndexChanged();
     void usersChanged();
     void alert(QObject* item);
     void removed();
