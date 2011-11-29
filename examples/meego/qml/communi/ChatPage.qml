@@ -20,6 +20,7 @@ import "UIConstants.js" as UI
 CommonPage {
     id: page
 
+    property alias count: listView.count
     property QtObject modelData: null
 
     function sendMessage(receiver, message) {
@@ -134,7 +135,7 @@ CommonPage {
             top: parent.top
             left: parent.left
             right: parent.right
-            bottom: textField.top
+            bottom: textField.visible ? textField.top : parent.bottom
             margins: UI.PAGE_MARGIN
         }
 
