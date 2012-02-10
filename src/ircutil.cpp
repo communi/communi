@@ -24,6 +24,8 @@
 #include "ircutil.h"
 #include <QString>
 #include <QRegExp>
+#include <QStringList>
+#include <QDebug>
 
 /*!
     \file ircutil.h
@@ -48,6 +50,8 @@ static QRegExp URL_PATTERN(QLatin1String("((www\\.(?!\\.)|(ssh|fish|irc|amarok|(
 QString IrcUtil::messageToHtml(const QString& message)
 {
     QString processed = message;
+
+    //qDebug() << "Before processing: " << processed;
     processed.replace(QLatin1Char('&'), QLatin1String("&amp;"));
     processed.replace(QLatin1Char('<'), QLatin1String("&lt;"));
     processed.replace(QLatin1Char('>'), QLatin1String("&gt;"));
@@ -67,6 +71,10 @@ QString IrcUtil::messageToHtml(const QString& message)
     };
     int state = None;
 
+    // Set default colours - MJ
+    QString forecolour = "black";
+    QString backcolour = "transparent";
+
     int pos = 0;
     bool parseColor = false;
     while (pos < processed.size())
@@ -74,19 +82,72 @@ QString IrcUtil::messageToHtml(const QString& message)
         if (parseColor)
         {
             int len = 0;
-            if (processed.at(pos).isDigit()) ++len;
-            if (pos+1 < processed.size() && processed.at(pos+1).isDigit()) ++len;
+            // If the first character is a digit, we have a valid colour tag. - MJ
+            if (processed.at(pos).isDigit())
+            {
+                ++len;
+                // Find the first comma (,). If it's in the right place, we have
+                // a foreground and background colour. -MJ
+                int comma = processed.indexOf(QLatin1Char(','), pos) - pos;
+                //qDebug() << "Comma: " << comma;
+                if (comma == 1 || comma == 2)
+                    len = comma + 1;
+                int index = pos + len;
+                //qDebug() << "Index: " << index << "Character: " << processed.at(index);
+                // Grab the next 1 or 2 characters if they are digits - they form
+                // part of the colour tag. - MJ
+                if (index < processed.size() && processed.at(index).isDigit())
+                {
+                    ++len;
+                    ++index;
+                    //qDebug() << "Index: " << index << "Character: " << processed.at(index);
+                    if ((index) < processed.size() && processed.at(index).isDigit())
+                        ++len;
 
-            bool ok = false;
-            int code = processed.mid(pos, len).toInt(&ok);
-            if (ok)
+                }
+            }
+            //qDebug() << "Length: " << len;
+
+            bool foreok = false;
+            bool backok = false;
+            int forecode = 1;
+            int backcode = 0;
+
+            // Extract the colour tag. - MJ
+            QString colourString = processed.mid(pos, len);
+            //qDebug() << "colourString: " << colourString;
+
+            // Split the colour tag on the comma, if there is one, into foreground
+            // and background colour strings. - MJ
+            QStringList colorStringList = colourString.split(QLatin1Char(','), QString::SkipEmptyParts);
+            //qDebug() << "colorStringList" << colorStringList;
+
+            // Convert the colour strings into integer codes - MJ
+            if (!colorStringList[0].isEmpty())
+                forecode = colorStringList[0].toInt(&foreok);
+            //qDebug() << "Forecode: " << forecode;
+            if (colorStringList.count() > 1 && !colorStringList[1].isEmpty())
+                backcode = colorStringList[1].toInt(&backok);
+            //qDebug() << "Backcode:" << backcode;
+
+            // If the colour strings converted successfully, turn them into
+            // HTML colour names. - MJ.
+            if (foreok)
             {
                 processed.remove(pos, len);
-                QString color = colorCodeToName(code);
-                processed = processed.arg(color);
-                len = color.length();
+                forecolour = colorCodeToName(forecode);
+                if (backok)
+                {
+                    backcolour = colorCodeToName(backcode);
+                }
             }
-            pos += len;
+
+            // qDebug() << forecolour << backcolour;
+
+            // Add the colour names to the message string - MJ
+            processed = processed.arg(forecolour);
+            processed = processed.arg(backcolour);
+            len = forecolour.length() + backcolour.length();
             if (pos >= processed.size())
                 break;
             parseColor = false;
@@ -103,16 +164,16 @@ QString IrcUtil::messageToHtml(const QString& message)
             state ^= Bold;
             break;
 
-        case '\x03': // color
+        case '\x03': // color - modified to include a background-color tag. - MJ
             if (state & Color)
-                replacement = QLatin1String("</span>");
+                replacement = QLatin1String("</span></span>");
             else
-                replacement = QLatin1String("<span style='color: %1'>");
+                replacement = QLatin1String("<span style='color: %1'><span style='background-color: %2'>");
             state ^= Color;
             parseColor = state & Color;
             break;
 
-        //case '\x09': // italic
+            //case '\x09': // italic
         case '\x1d': // italic
             if (state & Italic)
                 replacement = QLatin1String("</span>");
@@ -191,8 +252,8 @@ QString IrcUtil::messageToHtml(const QString& message)
         // there's an opening parenthesis preceding in the beginning of the
         // URL or there is no opening parenthesis in the URL at all.
         if (pos > 0 && href.endsWith(QLatin1Char(')'))
-            && (processed.at(pos-1) == QLatin1Char('(')
-            || !href.contains(QLatin1Char('('))))
+                && (processed.at(pos-1) == QLatin1Char('(')
+                    || !href.contains(QLatin1Char('('))))
         {
             append.prepend(href.right(1));
             href.chop(1);
@@ -218,6 +279,8 @@ QString IrcUtil::messageToHtml(const QString& message)
         processed.replace(pos, len, link);
         pos += link.length();
     }
+
+    //qDebug() << "After processing: " << processed;
 
     return processed;
 }
