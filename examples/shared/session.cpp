@@ -183,7 +183,7 @@ void Session::setSecure(bool secure)
     if (secure && !sslSocket)
     {
         sslSocket = new QSslSocket(this);
-        sslSocket->setPeerVerifyMode(QSslSocket::VerifyNone);
+        sslSocket->setPeerVerifyMode(QSslSocket::QueryPeer);
         sslSocket->ignoreSslErrors();
         setSocket(sslSocket);
     }
