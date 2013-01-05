@@ -172,7 +172,7 @@ void MessageHandler::handleNickMessage(IrcNickMessage* message)
 {
     bool received = false;
     QString nick = message->sender().name().toLower();
-    foreach(MessageReceiver * receiver, d.receivers) {
+    foreach (MessageReceiver* receiver, d.receivers) {
         if (receiver->hasUser(nick)) {
             received = true;
             receiver->receiveMessage(message);
@@ -181,7 +181,7 @@ void MessageHandler::handleNickMessage(IrcNickMessage* message)
     if (!received && d.currentReceiver)
         d.currentReceiver->receiveMessage(message);
 
-    foreach(const QString & receiver, d.receivers.keys()) {
+    foreach (const QString& receiver, d.receivers.keys()) {
         if (!nick.compare(receiver, Qt::CaseInsensitive)) {
             emit receiverToBeRenamed(receiver, message->nick());
             MessageReceiver* object = d.receivers.take(nick);
@@ -296,7 +296,7 @@ void MessageHandler::handlePrivateMessage(IrcPrivateMessage* message)
 void MessageHandler::handleQuitMessage(IrcQuitMessage* message)
 {
     QString nick = message->sender().name();
-    foreach(MessageReceiver * receiver, d.receivers) {
+    foreach (MessageReceiver* receiver, d.receivers) {
         if (receiver->hasUser(nick))
             receiver->receiveMessage(message);
     }

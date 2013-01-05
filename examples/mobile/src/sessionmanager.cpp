@@ -50,8 +50,8 @@ void SessionManager::restore()
 {
     Settings* settings = static_cast<Settings*>(m_context->contextProperty("Settings").value<QObject*>());
     if (settings) {
-        foreach(const ConnectionInfo & connection, settings->connections())
-        addSession(Session::fromConnection(connection));
+        foreach (const ConnectionInfo& connection, settings->connections())
+            addSession(Session::fromConnection(connection));
     }
 }
 
@@ -60,7 +60,7 @@ void SessionManager::save()
     Settings* settings = static_cast<Settings*>(m_context->contextProperty("Settings").value<QObject*>());
     if (settings) {
         ConnectionInfos connections;
-        foreach(QObject * item, m_items) {
+        foreach (QObject* item, m_items) {
             SessionItem* sessionItem = static_cast<SessionItem*>(item);
             connections += sessionItem->session()->toConnection();
         }

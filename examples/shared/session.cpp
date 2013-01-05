@@ -75,9 +75,10 @@ ChannelInfos Session::channels() const
 void Session::addChannel(const QString& channel)
 {
     const QString lower = channel.toLower();
-    foreach(const ChannelInfo & info, m_channels)
-    if (info.channel.toLower() == lower)
-        return;
+    foreach (const ChannelInfo& info, m_channels) {
+        if (info.channel.toLower() == lower)
+            return;
+    }
 
     ChannelInfo info;
     info.channel = channel;
@@ -328,7 +329,7 @@ void Session::destructLater()
 
 void Session::onConnected()
 {
-    foreach(const ChannelInfo & channel, m_channels) {
+    foreach (const ChannelInfo& channel, m_channels) {
         if (!channel.channel.isEmpty())
             sendCommand(IrcCommand::createJoin(channel.channel, channel.key));
     }
@@ -368,7 +369,7 @@ void Session::handleMessage(IrcMessage* message)
     } else if (message->type() == IrcMessage::Numeric) {
         int code = static_cast<IrcNumericMessage*>(message)->code();
         if (code == Irc::RPL_ISUPPORT) {
-            foreach(const QString & param, message->parameters().mid(1)) {
+            foreach (const QString& param, message->parameters().mid(1)) {
                 QStringList keyValue = param.split("=", QString::SkipEmptyParts);
                 m_info.insert(keyValue.value(0), keyValue.value(1));
             }
