@@ -56,15 +56,15 @@ void IrcClient::onDisconnected()
 
 void IrcClient::onTextEntered()
 {
-    IrcCommand* cmd = IrcCommand::createMessage(CHANNEL, lineEdit->text());
-    session->sendCommand(cmd);
+    IrcCommand* command = IrcCommand::createMessage(CHANNEL, lineEdit->text());
 
     // echo own messages
-    IrcMessage* msg = IrcMessage::fromData(":" + session->nickName().toUtf8() + " " + cmd->toString().toUtf8(), session);
+    IrcMessage* msg = IrcMessage::fromCommand(session->nickName(), command, session);
     receiveMessage(msg);
     delete msg;
 
     lineEdit->clear();
+    session->sendCommand(command);
 }
 
 void IrcClient::receiveMessage(IrcMessage* message)
