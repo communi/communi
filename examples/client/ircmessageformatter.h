@@ -20,6 +20,7 @@ public:
 
 private:
     static QString formatJoinMessage(IrcJoinMessage* message);
+    static QString formatNamesMessage(IrcNamesMessage* message);
     static QString formatNickMessage(IrcNickMessage* message);
     static QString formatPartMessage(IrcPartMessage* message);
     static QString formatPrivateMessage(IrcPrivateMessage* message);

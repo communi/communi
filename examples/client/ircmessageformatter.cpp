@@ -22,6 +22,9 @@ QString IrcMessageFormatter::formatMessage(IrcMessage* message)
         case IrcMessage::Join:
             formatted = formatJoinMessage(static_cast<IrcJoinMessage*>(message));
             break;
+        case IrcMessage::Names:
+            formatted = formatNamesMessage(static_cast<IrcNamesMessage*>(message));
+            break;
         case IrcMessage::Nick:
             formatted = formatNickMessage(static_cast<IrcNickMessage*>(message));
             break;
@@ -54,6 +57,11 @@ QString IrcMessageFormatter::formatJoinMessage(IrcJoinMessage* message)
         return QObject::tr("You have joined the chat room as %1").arg(sender);
     else
         return QObject::tr("%1 has joined the chat room").arg(sender);
+}
+
+QString IrcMessageFormatter::formatNamesMessage(IrcNamesMessage* message)
+{
+    return QObject::tr("The chat room has %1 users").arg(message->names().count());
 }
 
 QString IrcMessageFormatter::formatNickMessage(IrcNickMessage* message)
